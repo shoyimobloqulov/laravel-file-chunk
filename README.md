@@ -1,66 +1,137 @@
-<p align="center"><a href="https://laravel.com" target="_blank"><img src="https://raw.githubusercontent.com/laravel/art/master/logo-lockup/5%20SVG/2%20CMYK/1%20Full%20Color/laravel-logolockup-cmyk-red.svg" width="400" alt="Laravel Logo"></a></p>
+## Resize file upload
+<pre>
+upload_max_filesize = 5000M
+post_max_size = 5000M
+max_input_time = 3000
+max_execution_time = 3000
+</pre>
 
-<p align="center">
-<a href="https://github.com/laravel/framework/actions"><img src="https://github.com/laravel/framework/workflows/tests/badge.svg" alt="Build Status"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/dt/laravel/framework" alt="Total Downloads"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/v/laravel/framework" alt="Latest Stable Version"></a>
-<a href="https://packagist.org/packages/laravel/framework"><img src="https://img.shields.io/packagist/l/laravel/framework" alt="License"></a>
-</p>
+# Frontend setup
+* Install the <a href='http://resumablejs.com/'>resuumable</a> plugin by using CDN
+<pre>https://cdn.jsdelivr.net/npm/resumablejs@1.1.0/resumable.min.js</pre>
 
-## About Laravel
+* Write HTML code
+<pre>
+    <code>
+        <div class="container pt-4">
+            <div class="row justify-content-center">
+                <div class="col-md-8">
+                    <div class="card">
+                        <div class="card-header text-center">
+                            <h5>Upload File</h5>
+                        </div>
 
-Laravel is a web application framework with expressive, elegant syntax. We believe development must be an enjoyable and creative experience to be truly fulfilling. Laravel takes the pain out of development by easing common tasks used in many web projects, such as:
+                        <div class="card-body">
+                            <div id="upload-container" class="text-center">
+                                <button id="browseFile" class="btn btn-primary">Brows File</button>
+                            </div>
+                            <div  style="display: none" class="progress mt-3" style="height: 25px">
+                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100" style="width: 75%; height: 100%">75%</div>
+                            </div>
+                        </div>
 
-- [Simple, fast routing engine](https://laravel.com/docs/routing).
-- [Powerful dependency injection container](https://laravel.com/docs/container).
-- Multiple back-ends for [session](https://laravel.com/docs/session) and [cache](https://laravel.com/docs/cache) storage.
-- Expressive, intuitive [database ORM](https://laravel.com/docs/eloquent).
-- Database agnostic [schema migrations](https://laravel.com/docs/migrations).
-- [Robust background job processing](https://laravel.com/docs/queues).
-- [Real-time event broadcasting](https://laravel.com/docs/broadcasting).
+                        <div class="card-footer p-4" style="display: none">
+                            <video id="videoPreview" src="" controls style="width: 100%; height: auto"></video>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </code>
+</pre>
 
-Laravel is accessible, powerful, and provides tools required for large, robust applications.
+* Write JavaScript to upload large files via resumable in chunks
 
-## Learning Laravel
 
-Laravel has the most extensive and thorough [documentation](https://laravel.com/docs) and video tutorial library of all modern web application frameworks, making it a breeze to get started with the framework.
+<code>
+<script type="text/javascript">
+    let browseFile = $('#browseFile');
+    let resumable = new Resumable({
+        target: '{{ route('files.upload.large') }}',
+        query:{_token:'{{ csrf_token() }}'} ,// CSRF token
+        fileType: ['mp4'],
+        chunkSize: 10*1024*1024, // default is 1*1024*1024, this should be less than your maximum limit in php.ini
+        headers: {
+            'Accept' : 'application/json'
+        },
+        testChunks: false,
+        throttleProgressCallbacks: 1,
+    });
 
-You may also try the [Laravel Bootcamp](https://bootcamp.laravel.com), where you will be guided through building a modern Laravel application from scratch.
+    resumable.assignBrowse(browseFile[0]);
 
-If you don't feel like reading, [Laracasts](https://laracasts.com) can help. Laracasts contains over 2000 video tutorials on a range of topics including Laravel, modern PHP, unit testing, and JavaScript. Boost your skills by digging into our comprehensive video library.
+    resumable.on('fileAdded', function (file) { // trigger when file picked
+        showProgress();
+        resumable.upload() // to actually start uploading.
+    });
 
-## Laravel Sponsors
+    resumable.on('fileProgress', function (file) { // trigger when file progress update
+        updateProgress(Math.floor(file.progress() * 100));
+    });
 
-We would like to extend our thanks to the following sponsors for funding Laravel development. If you are interested in becoming a sponsor, please visit the Laravel [Patreon page](https://patreon.com/taylorotwell).
+    resumable.on('fileSuccess', function (file, response) { // trigger when file upload complete
+        response = JSON.parse(response)
+        $('#videoPreview').attr('src', response.path);
+        $('.card-footer').show();
+    });
 
-### Premium Partners
+    resumable.on('fileError', function (file, response) { // trigger when there is any error
+        alert('file uploading error.')
+    });
 
-- **[Vehikl](https://vehikl.com/)**
-- **[Tighten Co.](https://tighten.co)**
-- **[Kirschbaum Development Group](https://kirschbaumdevelopment.com)**
-- **[64 Robots](https://64robots.com)**
-- **[Cubet Techno Labs](https://cubettech.com)**
-- **[Cyber-Duck](https://cyber-duck.co.uk)**
-- **[Many](https://www.many.co.uk)**
-- **[Webdock, Fast VPS Hosting](https://www.webdock.io/en)**
-- **[DevSquad](https://devsquad.com)**
-- **[Curotec](https://www.curotec.com/services/technologies/laravel/)**
-- **[OP.GG](https://op.gg)**
-- **[WebReinvent](https://webreinvent.com/?utm_source=laravel&utm_medium=github&utm_campaign=patreon-sponsors)**
-- **[Lendio](https://lendio.com)**
 
-## Contributing
+    let progress = $('.progress');
+    function showProgress() {
+        progress.find('.progress-bar').css('width', '0%');
+        progress.find('.progress-bar').html('0%');
+        progress.find('.progress-bar').removeClass('bg-success');
+        progress.show();
+    }
 
-Thank you for considering contributing to the Laravel framework! The contribution guide can be found in the [Laravel documentation](https://laravel.com/docs/contributions).
+    function updateProgress(value) {
+        progress.find('.progress-bar').css('width', `${value}%`)
+        progress.find('.progress-bar').html(`${value}%`)
+    }
 
-## Code of Conduct
+    function hideProgress() {
+        progress.hide();
+    }
+</script>
+</code>
 
-In order to ensure that the Laravel community is welcoming to all, please review and abide by the [Code of Conduct](https://laravel.com/docs/contributions#code-of-conduct).
+# The backend setup
+* Install <a href='https://github.com/pionl/laravel-chunk-upload'>laravel-chunk-upload</a> in your Laravel project
+<code>
+public function uploadLargeFiles(Request $request) {
+    $receiver = new FileReceiver('file', $request, HandlerFactory::classFromRequest($request));
 
-## Security Vulnerabilities
+    if (!$receiver->isUploaded()) {
+        // file not uploaded
+    }
 
-If you discover a security vulnerability within Laravel, please send an e-mail to Taylor Otwell via [taylor@laravel.com](mailto:taylor@laravel.com). All security vulnerabilities will be promptly addressed.
+    $fileReceived = $receiver->receive(); // receive file
+    if ($fileReceived->isFinished()) { // file uploading is complete / all chunks are uploaded
+        $file = $fileReceived->getFile(); // get file
+        $extension = $file->getClientOriginalExtension();
+        $fileName = str_replace('.'.$extension, '', $file->getClientOriginalName()); //file name without extenstion
+        $fileName .= '_' . md5(time()) . '.' . $extension; // a unique file name
 
-## License
+        $disk = Storage::disk(config('filesystems.default'));
+        $path = $disk->putFileAs('videos', $file, $fileName);
 
-The Laravel framework is open-sourced software licensed under the [MIT license](https://opensource.org/licenses/MIT).
+        // delete chunked file
+        unlink($file->getPathname());
+        return [
+            'path' => asset('storage/' . $path),
+            'filename' => $fileName
+        ];
+    }
+
+    // otherwise return percentage information
+    $handler = $fileReceived->handler();
+    return [
+        'done' => $handler->getPercentageDone(),
+        'status' => true
+    ];
+}
+</code>

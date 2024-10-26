@@ -1,4 +1,4 @@
-## Resize file upload
+## php.ini configuration varable
 <pre>
 upload_max_filesize = 5000M
 post_max_size = 5000M
@@ -11,46 +11,43 @@ max_execution_time = 3000
 <pre>https://cdn.jsdelivr.net/npm/resumablejs@1.1.0/resumable.min.js</pre>
 
 * Write HTML code
-<pre>
-    <code>
-        <div class="container pt-4">
-            <div class="row justify-content-center">
-                <div class="col-md-8">
-                    <div class="card">
-                        <div class="card-header text-center">
-                            <h5>Upload File</h5>
-                        </div>
+```html
+    <div class="container pt-4">
+        <div class="row justify-content-center">
+            <div class="col-md-8">
+                <div class="card">
+                    <div class="card-header text-center">
+                        <h5>Upload File</h5>
+                    </div>
 
-                        <div class="card-body">
-                            <div id="upload-container" class="text-center">
-                                <button id="browseFile" class="btn btn-primary">Brows File</button>
-                            </div>
-                            <div  style="display: none" class="progress mt-3" style="height: 25px">
-                                <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100" style="width: 75%; height: 100%">75%</div>
-                            </div>
+                    <div class="card-body">
+                        <div id="upload-container" class="text-center">
+                            <button id="browseFile" class="btn btn-primary">Brows File</button>
                         </div>
+                        <div  style="display: none" class="progress mt-3" style="height: 25px">
+                            <div class="progress-bar progress-bar-striped progress-bar-animated" role="progressbar" aria-valuenow="75" aria-valuemin="0" aria-valuemax="100" style="width: 75%; height: 100%">75%</div>
+                        </div>
+                    </div>
 
-                        <div class="card-footer p-4" style="display: none">
-                            <video id="videoPreview" src="" controls style="width: 100%; height: auto"></video>
-                        </div>
+                    <div class="card-footer p-4" style="display: none">
+                        <video id="videoPreview" src="" controls style="width: 100%; height: auto"></video>
                     </div>
                 </div>
             </div>
         </div>
-    </code>
-</pre>
+    </div>
+```
 
 * Write JavaScript to upload large files via resumable in chunks
 
 
-<code>
-<script type="text/javascript">
+```js
     let browseFile = $('#browseFile');
     let resumable = new Resumable({
         target: '{{ route('files.upload.large') }}',
-        query:{_token:'{{ csrf_token() }}'} ,// CSRF token
+        query:{_token:'{{ csrf_token() }}'} ,
         fileType: ['mp4'],
-        chunkSize: 10*1024*1024, // default is 1*1024*1024, this should be less than your maximum limit in php.ini
+        chunkSize: 10*1024*1024, 
         headers: {
             'Accept' : 'application/json'
         },
@@ -60,22 +57,22 @@ max_execution_time = 3000
 
     resumable.assignBrowse(browseFile[0]);
 
-    resumable.on('fileAdded', function (file) { // trigger when file picked
+    resumable.on('fileAdded', function (file) { 
         showProgress();
-        resumable.upload() // to actually start uploading.
+        resumable.upload() 
     });
 
-    resumable.on('fileProgress', function (file) { // trigger when file progress update
+    resumable.on('fileProgress', function (file) { 
         updateProgress(Math.floor(file.progress() * 100));
     });
 
-    resumable.on('fileSuccess', function (file, response) { // trigger when file upload complete
+    resumable.on('fileSuccess', function (file, response) { 
         response = JSON.parse(response)
         $('#videoPreview').attr('src', response.path);
         $('.card-footer').show();
     });
 
-    resumable.on('fileError', function (file, response) { // trigger when there is any error
+    resumable.on('fileError', function (file, response) { 
         alert('file uploading error.')
     });
 
@@ -96,12 +93,11 @@ max_execution_time = 3000
     function hideProgress() {
         progress.hide();
     }
-</script>
-</code>
+```
 
 # The backend setup
 * Install <a href='https://github.com/pionl/laravel-chunk-upload'>laravel-chunk-upload</a> in your Laravel project
-<code>
+```php
 public function uploadLargeFiles(Request $request) {
     $receiver = new FileReceiver('file', $request, HandlerFactory::classFromRequest($request));
 
@@ -109,17 +105,17 @@ public function uploadLargeFiles(Request $request) {
         // file not uploaded
     }
 
-    $fileReceived = $receiver->receive(); // receive file
-    if ($fileReceived->isFinished()) { // file uploading is complete / all chunks are uploaded
-        $file = $fileReceived->getFile(); // get file
+    $fileReceived = $receiver->receive(); 
+    if ($fileReceived->isFinished()) { 
+        $file = $fileReceived->getFile();
         $extension = $file->getClientOriginalExtension();
-        $fileName = str_replace('.'.$extension, '', $file->getClientOriginalName()); //file name without extenstion
-        $fileName .= '_' . md5(time()) . '.' . $extension; // a unique file name
+        $fileName = str_replace('.'.$extension, '', $file->getClientOriginalName());
+
+        $fileName .= '_' . md5(time()) . '.' . $extension;
 
         $disk = Storage::disk(config('filesystems.default'));
         $path = $disk->putFileAs('videos', $file, $fileName);
 
-        // delete chunked file
         unlink($file->getPathname());
         return [
             'path' => asset('storage/' . $path),
@@ -127,11 +123,10 @@ public function uploadLargeFiles(Request $request) {
         ];
     }
 
-    // otherwise return percentage information
     $handler = $fileReceived->handler();
     return [
         'done' => $handler->getPercentageDone(),
         'status' => true
     ];
 }
-</code>
+```
